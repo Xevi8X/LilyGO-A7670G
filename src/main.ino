@@ -1,12 +1,14 @@
 #include "config.h"
 #include <Arduino.h>
-#include <TinyGPS++.h>
 #include "modem/modem.h"
+#include "gnss/gnss.h"
 
 const char server[] = "https://webhook.site/37cbb902-5503-41d9-8206-f96e92419be6";
 
-TinyGPSPlus gps;
-Modem my_modem;
+const uint8_t required_info = GNSS_DTO_Flags::LOCATION | GNSS_DTO_Flags::SATELLITES;
+
+GNSS gnss;
+Modem modem;
 
 void setup()
 {
@@ -34,22 +36,32 @@ void setup()
 
     delay(2000);
 
-    my_modem.init();
+    modem.init();
+    gnss.init();
 }
 
 void loop()
 {
-
-    // Read waiting bytes on GPS UART
-    while (SerialGPS.available()) {
-        int c = SerialGPS.read();
-        if (gps.encode(c)) 
-        {
-            
-        }
+    while(!gnss.update())
+    {
+        ;
     }
 
-    my_modem.https_post(server, "DUPA123");
+    auto gnss_dto = gnss.get();
 
-    delay(3000);
+    if(gnss_dto.flags & required_info == required_info)
+    {
+        String message = "Loc: ";
+        message += String(gnss_dto.latitude,7);
+        message += ", ";
+        message += String(gnss_dto.longitude,7);
+        message += ", ";
+        message += String(gnss_dto.satellites);
+        modem.https_post(server, message);
+        delay(5000);
+    }
+
+    Serial.print("Sat: ");
+    Serial.println(gnss_dto.satellites);
+    delay(100); 
 }
