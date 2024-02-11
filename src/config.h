@@ -24,3 +24,7 @@
 #define BOARD_GPS_RX_PIN                    22
 #define BOARD_GPS_PPS_PIN                   23
 #define BOARD_GPS_WAKEUP_PIN                19
+
+#ifndef TINY_GSM_MODEM_A7670
+#define TINY_GSM_MODEM_A7670
+#endif
