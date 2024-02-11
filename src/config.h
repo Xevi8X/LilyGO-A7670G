@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef SerialAT
 #define SerialAT Serial1
 #endif
