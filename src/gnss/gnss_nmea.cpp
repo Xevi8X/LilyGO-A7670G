@@ -18,9 +18,15 @@ bool GNSS_NMEA::update() {
     return false;
 }
 
+bool is_zero(double val)
+{
+    return abs(val) < 1e-4;
+}
+
 GNSS_DTO GNSS_NMEA::get()
 {
     GNSS_DTO dto;
+    dto.flags = 0;
 
     if(gps.time.isValid() && gps.time.age() < validity 
         && gps.date.isValid() && gps.date.age() < validity)
@@ -30,14 +36,8 @@ GNSS_DTO GNSS_NMEA::get()
         dto.flags |= GNSS_DTO_Flags::TIME;
     }
 
-    if(gps.location.isValid() && gps.location.age() < validity)
-    {
-        dto.latitude = static_cast<float>(gps.location.lat());
-        dto.longitude = static_cast<float>(gps.location.lng());
-        dto.flags |= GNSS_DTO_Flags::LOCATION;
-    }
-
-    if(gps.location.isValid() && gps.location.age() < validity)
+    if(gps.location.isValid() && gps.location.age() < validity
+        && !is_zero(gps.location.lat()) && !is_zero(gps.location.lng()))
     {
         dto.latitude = static_cast<float>(gps.location.lat());
         dto.longitude = static_cast<float>(gps.location.lng());

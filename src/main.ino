@@ -9,6 +9,7 @@ const uint8_t required_info = GNSS_DTO_Flags::LOCATION | GNSS_DTO_Flags::SATELLI
 
 GNSS gnss;
 Modem modem;
+int i = 0;
 
 void setup()
 {
@@ -60,8 +61,8 @@ void loop()
         modem.https_post(server, message);
         delay(5000);
     }
-
-    Serial.print("Sat: ");
+    Serial.print(i++);
+    Serial.print(": Sat: ");
     Serial.println(gnss_dto.satellites);
-    delay(100); 
+    delay(1000); 
 }
