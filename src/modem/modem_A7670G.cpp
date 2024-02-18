@@ -8,12 +8,15 @@ Modem_A7670G::Modem_A7670G()
 void Modem_A7670G::init() 
 {
     // power on by power key
+    pinMode(BOARD_MODEM_DTR_PIN, OUTPUT);
+    digitalWrite(BOARD_MODEM_DTR_PIN, LOW);
     pinMode(BOARD_MODEM_PWR_PIN, OUTPUT);
     digitalWrite(BOARD_MODEM_PWR_PIN, LOW);
     delay(100);
     digitalWrite(BOARD_MODEM_PWR_PIN, HIGH);
     delay(1000);
     digitalWrite(BOARD_MODEM_PWR_PIN, LOW);
+    digitalWrite(BOARD_MODEM_DTR_PIN, HIGH);
 
     modem.init();
     String name = modem.getModemName();
