@@ -50,6 +50,12 @@ GNSS_DTO GNSS_NMEA::get()
         dto.flags |= GNSS_DTO_Flags::ALTITUDE;
     }
 
+    if(gps.hdop.isValid() && gps.hdop.age() < validity)
+    {
+        dto.HDOP = static_cast<float>(gps.hdop.hdop());
+        dto.flags |= GNSS_DTO_Flags::HDOP;
+    }
+
     if(gps.speed.isValid() && gps.speed.age() < validity
         && gps.course.isValid() && gps.course.age() < validity)
     {

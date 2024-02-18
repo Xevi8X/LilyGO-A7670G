@@ -7,6 +7,14 @@ Modem_A7670G::Modem_A7670G()
 
 void Modem_A7670G::init() 
 {
+    // power on by power key
+    pinMode(BOARD_MODEM_PWR_PIN, OUTPUT);
+    digitalWrite(BOARD_MODEM_PWR_PIN, LOW);
+    delay(100);
+    digitalWrite(BOARD_MODEM_PWR_PIN, HIGH);
+    delay(1000);
+    digitalWrite(BOARD_MODEM_PWR_PIN, LOW);
+
     modem.init();
     String name = modem.getModemName();
     monitor.print("Modem Name:");
@@ -45,7 +53,10 @@ void Modem_A7670G::init()
     monitor.println(modem.getLocalIP());
 }
 
-void Modem_A7670G::turn_off() {}
+void Modem_A7670G::turn_off() 
+{
+    modem.poweroff();
+}
 
 Response Modem_A7670G::https_get(const String &url)
 {
@@ -87,4 +98,14 @@ Response Modem_A7670G::https_post(const String &url, uint8_t *payload, size_t si
     response.body = modem.https_body();
 
     return response;
+}
+
+String Modem_A7670G::get_info()
+{
+    String cpsi;
+    if(modem.getSystemInformation(cpsi));
+    {
+        return cpsi;
+    }
+    return "";
 }

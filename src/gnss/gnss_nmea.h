@@ -18,5 +18,5 @@ private:
     TinyGPSPlus gps;
     Stream& serial_gps;
 
-    constexpr static uint32_t validity = 2000U;
+    constexpr static uint32_t validity = 60000U; 
 };

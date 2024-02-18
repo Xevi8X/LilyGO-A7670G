@@ -1,5 +1,5 @@
 #include "gnss.h"
-#include "gnss_nmea.h"
+#include "gnss_L76K.h"
 
 GNSS::GNSS()
 {
@@ -16,7 +16,7 @@ GNSS::~GNSS()
 
 void GNSS::init()
 {
-    backend = new GNSS_NMEA();
+    backend = new GNSS_L76K();
 
     if (backend) {
         backend->init();

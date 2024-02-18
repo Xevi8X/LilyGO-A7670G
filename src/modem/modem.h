@@ -16,6 +16,8 @@ public:
     Response https_post(const String& url, const String& payload);
     Response https_post(const String& url, uint8_t *payload, size_t size);
 
+    String get_info();
+
 private:
     Modem_Backend* backend;
 };

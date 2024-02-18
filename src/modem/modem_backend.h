@@ -12,4 +12,6 @@ public:
 
     virtual Response https_get(const String& url) = 0;
     virtual Response https_post(const String& url, uint8_t *payload, size_t size) = 0;
+
+    virtual String get_info() = 0;
 };

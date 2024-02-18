@@ -15,6 +15,8 @@ public:
     Response https_get(const String& url) override;
     Response https_post(const String& url, uint8_t *payload, size_t size) override;
 
+    String get_info() override;
+
 private:
     Stream&        monitor;
     TinyGsm        modem;

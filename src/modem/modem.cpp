@@ -53,3 +53,12 @@ Response Modem::https_post(const String &url, uint8_t *payload, size_t size)
     }
     return backend->https_post(url, payload, size);
 }
+
+String Modem::get_info()
+{
+    if(!backend)
+    {
+        return "";
+    }
+    return backend->get_info();
+}
