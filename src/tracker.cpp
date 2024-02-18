@@ -44,7 +44,7 @@ void Tracker::loop()
         message += String(gnss_dto.satellites);
         message += ",";
         message += String(read_battery_mv());
-        modem.https_post(server_base_url, message);
+        modem.https_post(server_url, message);
         deep_sleep();
     }
 
@@ -52,7 +52,7 @@ void Tracker::loop()
     {
         String message = "Fix timeout! Bat: ";
         message += String(read_battery_mv());
-        message += " mv";
+        message += " mV";
         modem.https_post(server_url, message);
         deep_sleep();
     }
