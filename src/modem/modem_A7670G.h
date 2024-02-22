@@ -9,7 +9,7 @@ public:
     Modem_A7670G();
     virtual ~Modem_A7670G() {}
 
-    void init() override;
+    bool init() override;
     void turn_off() override;
 
     Response https_get(const String& url) override;
@@ -24,4 +24,7 @@ private:
     const char* apn = "internet";
     const char* gprsUser = "";
     const char* gprsPass = "";
+
+    static constexpr uint16_t timeout_ms = 20000;
+    static constexpr uint8_t retry = 5;
 };

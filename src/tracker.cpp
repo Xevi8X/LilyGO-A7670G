@@ -1,4 +1,5 @@
 #include <esp_adc_cal.h>
+#include <esp_task_wdt.h>
 #include "tracker.h"
 #include "serial_manager/serial_manager.h"
 
@@ -6,13 +7,16 @@ Tracker::Tracker(int id)
     : monitor{SerialManager::get_monitor_serial()}
 {
     snprintf(server_url,sizeof(server_url)/sizeof(char), "%s%d", server_base_url, id);
-    power_on_periphs();
-    send_info();
-    start_fixing = millis();
+    location.fixed = false;
+    // esp_task_wdt_init(WDT_TIMEOUT, true);  // enable panic so ESP32 restarts
+    // esp_task_wdt_add(NULL);
 }
 
 void Tracker::run() 
 {
+    power_on_board();
+    gnss.init();
+    start_fixing = millis();
 
     while(true)
     {
@@ -22,79 +26,88 @@ void Tracker::run()
 
 void Tracker::loop() 
 {
-    while(!gnss.update())
+    static bool location_fixing_done = false;
+    if (!location_fixing_done)
     {
-        ;
+        if (acquiring_location())
+        {
+            gnss.turn_off(); // < turn off to save power
+            location_fixing_done = true;
+        }
+        return;
     }
+    
+    auto battery_mv = read_battery_mv();
+    monitor.println("Bat: " + String(battery_mv));
 
-    auto gnss_dto = gnss.get();
-
-    if(gnss_dto.flags & required_info == required_info
-        && gnss_dto.satellites > min_sat
-        && gnss_dto.HDOP > 0.0f && gnss_dto.HDOP < max_HDOP)
+    if (modem.init())
     {
-        String message = String(gnss_dto.latitude,7);
-        message += ",";
-        message += String(gnss_dto.longitude,7);
-        message += ",";
-        message += String(gnss_dto.altitude,5);
-        message += ",";
-        message += String(gnss_dto.HDOP);
-        message += ",";
-        message += String(gnss_dto.satellites);
-        message += ",";
-        message += String(read_battery_mv());
-        modem.https_post(server_url, message);
-        deep_sleep();
+        send_info(battery_mv);
     }
-
-    if(millis() - start_fixing > fix_timeout)
-    {
-        String message = "Fix timeout! Bat: ";
-        message += String(read_battery_mv());
-        message += " mV";
-        modem.https_post(server_url, message);
-        deep_sleep();
-    }
+    modem.turn_off();
+    deep_sleep(battery_mv);
 }
 
-void Tracker::deep_sleep() 
+void Tracker::deep_sleep(uint16_t battery_mv) 
 {
-    power_off_periphs();
-    esp_sleep_enable_timer_wakeup(sleep_duration * 1000000ULL);
-    delay(200);
+    power_off_board();
+    uint64_t sleep_duration = calculate_sleep_duration(battery_mv);
+    if (sleep_duration > 0)
+    {
+        // sanity check
+        if (sleep_duration > UINT64_MAX / 1000000ULL)
+        {
+            sleep_duration = UINT64_MAX / 1000000ULL;
+        }
+        esp_sleep_enable_timer_wakeup(sleep_duration * 1000000ULL);
+        delay(200);
+    }
     esp_deep_sleep_start();
-    power_on_periphs(); // < this never happen
+    power_on_board(); // < this never happen
 }
 
-void Tracker::power_on_periphs() 
+void Tracker::power_on_board() 
 {
+    // Power on the board
     pinMode(BOARD_POWER_ON_PIN, OUTPUT);
     digitalWrite(BOARD_POWER_ON_PIN, HIGH);
     pinMode(BOARD_RST_PIN, OUTPUT);
     digitalWrite(BOARD_RST_PIN, LOW);
-
-    delay(3000);
-
-    modem.init();
-    gnss.init();
+    delay(1000);
 }
 
-void Tracker::power_off_periphs() 
+void Tracker::power_off_board() 
 {
-    gnss.turn_off();
-    modem.turn_off();
     digitalWrite(BOARD_POWER_ON_PIN, LOW);
 }
 
-void Tracker::send_info() 
+void Tracker::send_info(uint16_t battery_mv) 
 {
-    modem.https_post(server_url,"Starting tracking!");
-    String cpsi = modem.get_info();
-    if(cpsi.length() > 0)
+    String msg = String(battery_mv);
+    if (location.fixed)
     {
-        modem.https_post(server_url,cpsi);
+        msg += ",";
+        msg += String(location.dto.latitude,7);
+        msg += ",";
+        msg += String(location.dto.longitude,7);
+        msg += ",";
+        msg += String(location.dto.altitude,4);
+        msg += ",";
+        msg += String(location.dto.HDOP);
+        msg += ",";
+        msg += String(location.dto.satellites);
     }
+    else
+    {
+        msg += ",0,0,0,0,0";
+    }
+    String cpsi = modem.get_info();
+    if (cpsi.length() > 0)
+    {
+        msg += ",";
+        msg += cpsi;
+    }
+    modem.https_post(server_url, msg);
 }
 
 uint16_t Tracker::read_battery_mv()
@@ -102,4 +115,48 @@ uint16_t Tracker::read_battery_mv()
     esp_adc_cal_characteristics_t adc_chars;
     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
     return esp_adc_cal_raw_to_voltage(analogRead(BOARD_ADC_PIN), &adc_chars) * 2;
+}
+
+bool Tracker::acquiring_location() 
+{
+    while(!gnss.update())
+    {
+        ;
+    }
+            
+    auto gnss_dto = gnss.get();
+
+    if(gnss_dto.flags & required_info == required_info
+        && gnss_dto.satellites > min_sat
+        && gnss_dto.HDOP > 0.0f && gnss_dto.HDOP < max_HDOP)
+    {
+        location.fixed = true;
+        location.dto = gnss_dto;
+        monitor.println("Fixed!");
+        return true;
+    }
+    else if(millis() - start_fixing > fix_timeout)
+    {
+        monitor.println("Timeout!");
+        return true;
+    }
+    return false;
+}
+
+uint16_t Tracker::calculate_sleep_duration(uint16_t battery_mv) 
+{
+    if (battery_mv == 0)
+    {
+        monitor.println("Battery voltage is invalid!");
+        return 0;
+    }
+    if (battery_mv < 3300 || battery_mv > 4400)
+    {
+        return 0;
+    }
+    if (battery_mv < 3700)
+    {
+        return 4 * sleep_duration_base;
+    }
+    return sleep_duration_base;
 }

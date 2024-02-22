@@ -9,7 +9,7 @@ public:
     Modem();
     ~Modem();
 
-    void init();
+    bool init();
     void turn_off();
 
     Response https_get(const String& url);

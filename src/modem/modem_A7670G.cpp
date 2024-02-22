@@ -5,7 +5,7 @@ Modem_A7670G::Modem_A7670G()
     : modem(SerialManager::get_modem_serial()), monitor{SerialManager::get_monitor_serial()}
 {}
 
-void Modem_A7670G::init() 
+bool Modem_A7670G::init() 
 {
     // power on by power key
     pinMode(BOARD_MODEM_DTR_PIN, OUTPUT);
@@ -30,21 +30,23 @@ void Modem_A7670G::init()
     monitor.print("Waiting for network...");
     if (!modem.waitForNetwork()) {
         monitor.println(" fail");
-        delay(10000);
-        return;
+        return false;
     }
     monitor.println(" success");
 
     if (modem.isNetworkConnected()) {
         monitor.println("Network connected");
     }
+    else
+    {
+        return false;
+    }
 
     monitor.print(F("Connecting to "));
     monitor.print(apn);
     if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
         monitor.println(" fail");
-        delay(10000);
-        return;
+        return false;
     }
     monitor.println(" success");
 
@@ -54,6 +56,7 @@ void Modem_A7670G::init()
 
     monitor.print("IP: ");
     monitor.println(modem.getLocalIP());
+    return true;
 }
 
 void Modem_A7670G::turn_off() 
@@ -75,10 +78,14 @@ Response Modem_A7670G::https_get(const String &url)
     modem.https_set_accept_type("plain/text");
     modem.https_set_user_agent("lilygo-A7670G");
 
-    response.http_code = modem.https_get();
-    response.header = modem.https_header();
-    response.body = modem.https_body();
-
+    for (uint8_t i = 0; i < retry; i++) {
+        response.http_code = modem.https_get();
+        if (response.http_code > 0) {
+            response.header = modem.https_header();
+            response.body = modem.https_body();
+            break;
+        }
+    }
     return response;
 }
 
@@ -96,10 +103,14 @@ Response Modem_A7670G::https_post(const String &url, uint8_t *payload, size_t si
     modem.https_set_accept_type("plain/text");
     modem.https_set_user_agent("lilygo-A7670G");
 
-    response.http_code = modem.https_post(payload, size);
-    response.header = modem.https_header();
-    response.body = modem.https_body();
-
+    for (uint8_t i = 0; i < retry; i++) {
+        response.http_code = modem.https_post(payload, size);
+        if (response.http_code > 0) {
+            response.header = modem.https_header();
+            response.body = modem.https_body();
+            break;
+        }
+    }
     return response;
 }
 

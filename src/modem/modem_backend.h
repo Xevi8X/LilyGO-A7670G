@@ -7,7 +7,7 @@ class Modem_Backend
 public:
     virtual ~Modem_Backend() {}
 
-    virtual void init() {};
+    virtual bool init() { return false; };
     virtual void turn_off() {};
 
     virtual Response https_get(const String& url) = 0;

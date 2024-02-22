@@ -15,12 +15,13 @@ Modem::~Modem()
     }
 }
 
-void Modem::init() {
+bool Modem::init() {
     backend = new Modem_A7670G();
 
     if (backend) {
-        backend->init();
+        return backend->init();
     }
+    return false;
 }
 
 void Modem::turn_off() 
