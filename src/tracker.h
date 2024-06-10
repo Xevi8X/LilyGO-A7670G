@@ -16,10 +16,9 @@ private:
     Stream& monitor;
     GNSS gnss;
     Modem modem;
+
     uint32_t start_fixing;
     uint32_t start_location_settling;
-    uint32_t blink;
-
     struct 
     {
         bool fixed;
@@ -27,16 +26,18 @@ private:
         LocationFilter filter;
     } location;
 
+    uint16_t battery_mv;
+    bool charger_status;
     const esp_sleep_wakeup_cause_t wakeup_cause;
     
     void loop();  
-    void deep_sleep(uint16_t battery_mv);
+    void deep_sleep();
     void power_on_board();
     void power_off_board();
-    void send_info(uint16_t battery_mv, bool charger_status);
+    void send_info();
     uint16_t read_battery_mv();
     bool acquiring_location();
-    uint64_t calculate_sleep_duration(uint16_t battery_mv);
+    uint64_t calculate_sleep_duration();
     bool read_charger_status();
 
     const char* server_base_url = "https://xevix.tplinkdns.com/location/";

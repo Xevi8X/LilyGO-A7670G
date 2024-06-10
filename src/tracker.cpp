@@ -40,24 +40,24 @@ void Tracker::loop()
         return;
     }
     
-    auto battery_mv = read_battery_mv();
+    battery_mv = read_battery_mv();
     monitor.println("Bat: " + String(battery_mv));
 
-    auto charger_status = read_charger_status();
+    charger_status = read_charger_status();
     monitor.println("Charger: " + String(charger_status));
 
     if (modem.init())
     {
-        send_info(battery_mv, charger_status);
+        send_info();
     }
     modem.turn_off();
-    deep_sleep(battery_mv);
+    deep_sleep();
 }
 
-void Tracker::deep_sleep(uint16_t battery_mv) 
+void Tracker::deep_sleep() 
 {
     power_off_board();
-    uint64_t sleep_duration = calculate_sleep_duration(battery_mv);
+    uint64_t sleep_duration = calculate_sleep_duration();
     if (sleep_duration > 0)
     {
         // sanity check
@@ -68,6 +68,8 @@ void Tracker::deep_sleep(uint16_t battery_mv)
         esp_sleep_enable_timer_wakeup(sleep_duration * 1000000ULL);
         delay(200);
     }
+    // always wake up on charger status change
+    esp_sleep_enable_ext1_wakeup(1ULL << BOARD_CHARGER_STATUS_PIN, charger_status ? ESP_EXT1_WAKEUP_ALL_LOW : ESP_EXT1_WAKEUP_ANY_HIGH);
     esp_deep_sleep_start();
     power_on_board(); // < this never happen
 }
@@ -87,7 +89,7 @@ void Tracker::power_off_board()
     digitalWrite(BOARD_POWER_ON_PIN, LOW);
 }
 
-void Tracker::send_info(uint16_t battery_mv, bool charger_status) 
+void Tracker::send_info() 
 {
 
     String msg = String(static_cast<uint8_t>(wakeup_cause));
@@ -178,7 +180,7 @@ bool Tracker::acquiring_location()
     return false;
 }
 
-uint64_t Tracker::calculate_sleep_duration(uint16_t battery_mv) 
+uint64_t Tracker::calculate_sleep_duration() 
 {
     if (battery_mv == 0)
     {
