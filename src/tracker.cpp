@@ -150,9 +150,24 @@ bool Tracker::acquiring_location()
         && gnss_dto.satellites > min_sat
         && gnss_dto.HDOP > 0.0f && gnss_dto.HDOP < max_HDOP)
     {
-        location.fixed = true;
-        location.dto = gnss_dto;
-        monitor.println("Fixed!");
+        if(!location.fixed)
+        {
+            location.fixed = true;
+            start_location_settling = millis();
+            monitor.println("Fixed!");
+            
+            // sanity
+            location.dto = gnss_dto;
+        }
+        location.filter.push(gnss_dto);
+    }
+    else if(start_location_settling > 0U && (millis() - start_location_settling > location_settling_time))
+    {
+        if(location.filter.is_started())
+        {
+            location.dto = location.filter.get();
+            monitor.println("Settled!");
+        }
         return true;
     }
     else if(millis() - start_fixing > fix_timeout)
