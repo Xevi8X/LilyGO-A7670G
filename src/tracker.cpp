@@ -5,6 +5,7 @@
 
 Tracker::Tracker(int id)
     :   monitor{SerialManager::get_monitor_serial()},
+        start_location_settling{0},
         wakeup_cause{esp_sleep_get_wakeup_cause()}
 {
     snprintf(server_url,sizeof(server_url)/sizeof(char), "%s%d", server_base_url, id);
@@ -70,6 +71,7 @@ void Tracker::deep_sleep()
     }
     // always wake up on charger status change
     esp_sleep_enable_ext1_wakeup(1ULL << BOARD_CHARGER_STATUS_PIN, charger_status ? ESP_EXT1_WAKEUP_ALL_LOW : ESP_EXT1_WAKEUP_ANY_HIGH);
+    monitor.println("Bye!");
     esp_deep_sleep_start();
     power_on_board(); // < this never happen
 }
