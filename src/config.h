@@ -33,3 +33,5 @@
 #ifndef TINY_GSM_MODEM_A7670
 #define TINY_GSM_MODEM_A7670
 #endif
+
+#define BOARD_CHARGER_STATUS_PIN              32

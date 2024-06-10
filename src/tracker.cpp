@@ -4,10 +4,13 @@
 #include "serial_manager/serial_manager.h"
 
 Tracker::Tracker(int id)
-    : monitor{SerialManager::get_monitor_serial()}
+    :   monitor{SerialManager::get_monitor_serial()},
+        wakeup_cause{esp_sleep_get_wakeup_cause()}
 {
     snprintf(server_url,sizeof(server_url)/sizeof(char), "%s%d", server_base_url, id);
     location.fixed = false;
+    monitor.println("Wakeup cause: " + String(static_cast<uint8_t>(wakeup_cause)));
+
     // esp_task_wdt_init(WDT_TIMEOUT, true);  // enable panic so ESP32 restarts
     // esp_task_wdt_add(NULL);
 }
@@ -40,9 +43,12 @@ void Tracker::loop()
     auto battery_mv = read_battery_mv();
     monitor.println("Bat: " + String(battery_mv));
 
+    auto charger_status = read_charger_status();
+    monitor.println("Charger: " + String(charger_status));
+
     if (modem.init())
     {
-        send_info(battery_mv);
+        send_info(battery_mv, charger_status);
     }
     modem.turn_off();
     deep_sleep(battery_mv);
@@ -81,9 +87,23 @@ void Tracker::power_off_board()
     digitalWrite(BOARD_POWER_ON_PIN, LOW);
 }
 
-void Tracker::send_info(uint16_t battery_mv) 
+void Tracker::send_info(uint16_t battery_mv, bool charger_status) 
 {
-    String msg = String(battery_mv);
+
+    String msg = String(static_cast<uint8_t>(wakeup_cause));
+
+    msg += ",";
+    msg += String(battery_mv);
+
+    if (charger_status)
+    {
+        msg += ",1";
+    }
+    else
+    {
+        msg += ",0";
+    }
+
     if (location.fixed)
     {
         msg += ",";
@@ -113,7 +133,7 @@ void Tracker::send_info(uint16_t battery_mv)
 uint16_t Tracker::read_battery_mv()
 {
     esp_adc_cal_characteristics_t adc_chars;
-    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12, 1100, &adc_chars);
     return esp_adc_cal_raw_to_voltage(analogRead(BOARD_ADC_PIN), &adc_chars) * 2;
 }
 
@@ -143,20 +163,26 @@ bool Tracker::acquiring_location()
     return false;
 }
 
-uint16_t Tracker::calculate_sleep_duration(uint16_t battery_mv) 
+uint64_t Tracker::calculate_sleep_duration(uint16_t battery_mv) 
 {
     if (battery_mv == 0)
     {
         monitor.println("Battery voltage is invalid!");
-        return 0;
+        return 0LLU;
     }
-    if (battery_mv < 3300 || battery_mv > 4400)
+    if (battery_mv < battery_crit_mv || battery_mv > battery_overvoltage_mv)
     {
-        return 0;
+        return 0LLU;
     }
-    if (battery_mv < 3700)
+    if (battery_mv < battery_low_mv)
     {
-        return 4 * sleep_duration_base;
+        return low_battery_multiplier * sleep_duration_base;
     }
     return sleep_duration_base;
+}
+
+bool Tracker::read_charger_status()
+{
+    pinMode(BOARD_CHARGER_STATUS_PIN, INPUT);
+    return (digitalRead(BOARD_CHARGER_STATUS_PIN) == HIGH) ? true : false;
 }
