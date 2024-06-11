@@ -5,12 +5,12 @@
 
 Tracker::Tracker(int id)
     :   monitor{SerialManager::get_monitor_serial()},
+        stage{Stage::INITIALIZING},
         start_location_settling{0},
         wakeup_cause{esp_sleep_get_wakeup_cause()}
 {
+    location.valid = false;
     snprintf(server_url,sizeof(server_url)/sizeof(char), "%s%d", server_base_url, id);
-    location.fixed = false;
-    monitor.println("Wakeup cause: " + String(static_cast<uint8_t>(wakeup_cause)));
 
     // esp_task_wdt_init(WDT_TIMEOUT, true);  // enable panic so ESP32 restarts
     // esp_task_wdt_add(NULL);
@@ -18,10 +18,6 @@ Tracker::Tracker(int id)
 
 void Tracker::run() 
 {
-    power_on_board();
-    gnss.init();
-    start_fixing = millis();
-
     while(true)
     {
         loop();
@@ -30,29 +26,83 @@ void Tracker::run()
 
 void Tracker::loop() 
 {
-    static bool location_fixing_done = false;
-    if (!location_fixing_done)
-    {
-        if (acquiring_location())
-        {
-            gnss.turn_off(); // < turn off to save power
-            location_fixing_done = true;
-        }
-        return;
-    }
-    
-    battery_mv = read_battery_mv();
-    monitor.println("Bat: " + String(battery_mv));
+    GNSS_DTO gnss_dto;
 
-    charger_status = read_charger_status();
-    monitor.println("Charger: " + String(charger_status));
-
-    if (modem.init())
+    switch (stage)
     {
-        send_info();
+        case Stage::INITIALIZING:
+            monitor.println("Initializing...");
+            monitor.println("Wakeup cause: " + String(static_cast<uint8_t>(wakeup_cause)));
+            monitor.println("Server: " + String(server_base_url));
+            power_on_board();
+            gnss.init();
+
+            monitor.println("Fixing...");
+            timepoint = millis();
+            stage = Stage::FIXING;
+            break;
+
+        case Stage::FIXING:
+            if(millis() - timepoint > fix_timeout)
+            {
+                monitor.println("Timeout!");
+                gnss.turn_off(); // < turn off to save power
+                stage = Stage::SENDING;
+            }
+            else if (acquire_location(gnss_dto))
+            {
+                monitor.println("First fix!");
+                location.filter.push(gnss_dto);
+                timepoint = millis();
+                stage = Stage::LOCATION_SETTLING;
+            }
+            break;
+
+        case Stage::LOCATION_SETTLING:
+            if(millis() - timepoint > location_settling_time)
+            {
+                gnss.turn_off(); // < turn off to save power
+                if(location.filter.is_started())
+                {
+                    location.dto = location.filter.get();
+                    location.valid = true;
+                    monitor.println("Settled!");
+                }
+                stage = Stage::SENDING;
+            }
+            else if (acquire_location(gnss_dto))
+            {
+                location.filter.push(gnss_dto);
+                monitor.println("Fix!");
+            }
+            break;
+
+        case Stage::SENDING:
+            battery_mv = read_battery_mv();
+            monitor.println("Bat: " + String(battery_mv));
+
+            charger_status = read_charger_status();
+            monitor.println("Charger: " + String(charger_status));
+
+            if (modem.init())
+            {
+                send_info();
+                monitor.println("Sent!");
+            }
+            else
+            {
+                monitor.println("Modem init failed!");
+            }
+
+            modem.turn_off();
+            stage = Stage::SLEEPING;
+            break;
+
+        case Stage::SLEEPING:
+            deep_sleep();
+            break; // < this never happen
+
     }
-    modem.turn_off();
-    deep_sleep();
 }
 
 void Tracker::deep_sleep() 
@@ -108,7 +158,7 @@ void Tracker::send_info()
         msg += ",0";
     }
 
-    if (location.fixed)
+    if (location.valid)
     {
         msg += ",";
         msg += String(location.dto.latitude,7);
@@ -141,44 +191,23 @@ uint16_t Tracker::read_battery_mv()
     return esp_adc_cal_raw_to_voltage(analogRead(BOARD_ADC_PIN), &adc_chars) * 2;
 }
 
-bool Tracker::acquiring_location() 
+bool Tracker::acquire_location(GNSS_DTO& location) 
 {
     while(!gnss.update())
     {
         ;
     }
-            
-    auto gnss_dto = gnss.get();
+        
+    GNSS_DTO gnss_dto = gnss.get();
 
     if(gnss_dto.flags & required_info == required_info
         && gnss_dto.satellites > min_sat
         && gnss_dto.HDOP > 0.0f && gnss_dto.HDOP < max_HDOP)
     {
-        if(!location.fixed)
-        {
-            location.fixed = true;
-            start_location_settling = millis();
-            monitor.println("Fixed!");
-            
-            // sanity
-            location.dto = gnss_dto;
-        }
-        location.filter.push(gnss_dto);
-    }
-    else if(start_location_settling > 0U && (millis() - start_location_settling > location_settling_time))
-    {
-        if(location.filter.is_started())
-        {
-            location.dto = location.filter.get();
-            monitor.println("Settled!");
-        }
+        location = gnss_dto;
         return true;
     }
-    else if(millis() - start_fixing > fix_timeout)
-    {
-        monitor.println("Timeout!");
-        return true;
-    }
+
     return false;
 }
 

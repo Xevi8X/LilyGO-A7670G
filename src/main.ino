@@ -4,7 +4,7 @@
 
 void setup()
 {
-    Tracker tracker{3};
+    Tracker tracker{1};
     tracker.run();
 }
 

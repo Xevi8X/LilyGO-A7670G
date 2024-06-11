@@ -17,11 +17,22 @@ private:
     GNSS gnss;
     Modem modem;
 
-    uint32_t start_fixing;
+    enum class Stage
+    {
+        INITIALIZING,
+        FIXING,
+        LOCATION_SETTLING,
+        SENDING,
+        SLEEPING,
+    };
+
+    Stage stage;
+    uint32_t timepoint;
+
     uint32_t start_location_settling;
     struct 
     {
-        bool fixed;
+        bool valid;
         GNSS_DTO dto;
         LocationFilter filter;
     } location;
@@ -36,7 +47,7 @@ private:
     void power_off_board();
     void send_info();
     uint16_t read_battery_mv();
-    bool acquiring_location();
+    bool acquire_location(GNSS_DTO& location);
     uint64_t calculate_sleep_duration();
     bool read_charger_status();
 
@@ -51,7 +62,7 @@ private:
     // Time parameters
     static constexpr uint64_t sleep_duration_base = 3600ULL;    // 60min = 3600s
     static constexpr uint32_t fix_timeout = 300000UL;           // 5min = 300'000ms
-    static constexpr uint32_t location_settling_time = 20000UL; // 10s = 10'000ms
+    static constexpr uint32_t location_settling_time = 20000UL; // 20s = 20'000ms
     static constexpr uint64_t low_battery_multiplier = 4;       // 4 x 60min = 240min
 
     // Battery parameters
