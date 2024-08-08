@@ -15,7 +15,9 @@
 #define BOARD_MODEM_PWR_PIN                 4
 #define BOARD_MODEM_RI_PIN                  33
 
-#define BOARD_ADC_PIN                       35
+// #define BOARD_ADC_PIN                       35
+#define BOARD_ADC_CHANNEL                   ADC1_CHANNEL_7
+
 #define BOARD_POWER_ON_PIN                  12 //< LED on board only
 #define BOARD_RST_PIN                       5
 #define BOARD_IO_BUTTON                     0
@@ -35,3 +37,5 @@
 #endif
 
 #define BOARD_CHARGER_STATUS_PIN              32
+
+// #define BATTERY_READ_TEST

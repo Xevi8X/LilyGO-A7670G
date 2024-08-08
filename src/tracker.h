@@ -47,6 +47,7 @@ private:
     void power_off_board();
     void send_info();
     uint16_t read_battery_mv();
+    uint16_t calibrate_adc_voltage(uint16_t raw);
     bool acquire_location(GNSS_DTO& location);
     uint64_t calculate_sleep_duration();
     bool read_charger_status();

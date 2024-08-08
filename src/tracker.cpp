@@ -18,6 +18,15 @@ Tracker::Tracker(int id)
 
 void Tracker::run() 
 {
+#if defined(BATTERY_READ_TEST)
+    monitor.println("Battery read test");
+    while(true)
+    {
+        monitor.println(read_battery_mv());
+        delay(1000);
+    }
+#endif
+
     while(true)
     {
         loop();
@@ -188,7 +197,18 @@ uint16_t Tracker::read_battery_mv()
 {
     esp_adc_cal_characteristics_t adc_chars;
     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12, 1100, &adc_chars);
-    return esp_adc_cal_raw_to_voltage(analogRead(BOARD_ADC_PIN), &adc_chars) * 2;
+    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_12));
+    ESP_ERROR_CHECK(adc1_config_channel_atten(BOARD_ADC_CHANNEL, ADC_ATTEN_DB_12));
+    return calibrate_adc_voltage(esp_adc_cal_raw_to_voltage(adc1_get_raw(BOARD_ADC_CHANNEL), &adc_chars) * 2);
+}
+
+uint16_t Tracker::calibrate_adc_voltage(uint16_t raw)
+{
+    // Temporiarly use a linear approximation, but it should be replaced by a proper two point esp calibration
+    constexpr float coeff_a = 1.3017f;
+    constexpr float coeff_b = -1360.9f;
+    float val = coeff_a * raw + coeff_b;
+    return val > 0.0f ? static_cast<uint32_t>(val) : 0U;
 }
 
 bool Tracker::acquire_location(GNSS_DTO& location) 
