@@ -8,7 +8,6 @@
 #define SerialGPS Serial2
 #endif
 
-
 #define BOARD_MODEM_DTR_PIN                 25
 #define BOARD_MODEM_TX_PIN                  26
 #define BOARD_MODEM_RX_PIN                  27

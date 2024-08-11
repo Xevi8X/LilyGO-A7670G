@@ -1,8 +1,9 @@
 #include "config.h"
 #include <Arduino.h>
-#include "modem/modem.h"
 #include "gnss/gnss.h"
 #include "location_filter/location_filter.h"
+#include "modem/modem.h"
+#include "server/server_info.h"
 #include <Stream.h>
 
 class Tracker
@@ -13,6 +14,7 @@ public:
     void run();
     
 private:
+    int id;
     Stream& monitor;
     GNSS gnss;
     Modem modem;
@@ -52,8 +54,11 @@ private:
     uint64_t calculate_sleep_duration();
     bool read_charger_status();
 
-    const char* server_base_url = "https://xevix.tplinkdns.com/location/";
-    char server_url[50];
+    ServerInfo servers[3] = {
+        {.host = "xevix.tplinkdns.com", .path = "location", .ssl = true, .break_on_success = false, .offset = 0},
+        {.host = "dev.iotlocator.cloud", .path = "api/v1", .ssl = true, .break_on_success = true, .offset = 0},
+        {.host = "unsafe.iotlocator.cloud", .path = "api/v1", .ssl = false, .break_on_success = true, .offset = 1000},
+    };
 
     // Minimal valid information
     static constexpr uint8_t required_info = GNSS_DTO_Flags::LOCATION | GNSS_DTO_Flags::SATELLITES | GNSS_DTO_Flags::HDOP;

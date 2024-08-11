@@ -56,6 +56,19 @@ bool Modem_A7670G::init()
 
     monitor.print("IP: ");
     monitor.println(modem.getLocalIP());
+
+    // modem.sendAT(GF("+CSSLCFG=\"ignorelocaltime\",0,1"));  // Ignore SSL certificate time
+    // if (modem.waitResponse(5000L) != 1) monitor.println("Failed to set SSL certificate time");
+
+    // modem.sendAT(GF("+CCLK=\"24/08/11,13:00:00+01\""));
+    // if (modem.waitResponse(5000L) != 1) monitor.println("Failed to set time");
+
+    // modem.sendAT(GF("+CSSLCFG=\"sslversion\",0,3"));  // TLS 1.2
+    // if (modem.waitResponse(5000L) != 1) monitor.println("Failed to set SSL version");
+
+    // modem.sendAT(GF("+CSSLCFG=\"enableSNI\",0,1"));  // SNI
+    // if (modem.waitResponse(5000L) != 1) monitor.println("Failed to enable SNI");
+
     return true;
 }
 
@@ -75,7 +88,7 @@ Response Modem_A7670G::https_get(const String &url)
     }
 
     modem.https_add_header("Accept-Encoding", "gzip, deflate, br");
-    modem.https_set_accept_type("plain/text");
+    modem.https_set_accept_type("*/*");
     modem.https_set_user_agent("lilygo-A7670G");
 
     for (uint8_t i = 0; i < retry; i++) {
@@ -99,8 +112,10 @@ Response Modem_A7670G::https_post(const String &url, uint8_t *payload, size_t si
         return response;
     }
 
+    modem.https_add_header("Connection", "keep-alive");
     modem.https_add_header("Accept-Encoding", "gzip, deflate, br");
-    modem.https_set_accept_type("plain/text");
+    modem.https_set_content_type("text/plain");
+    modem.https_set_accept_type("*/*");
     modem.https_set_user_agent("lilygo-A7670G");
 
     for (uint8_t i = 0; i < retry; i++) {

@@ -4,13 +4,13 @@
 #include "serial_manager/serial_manager.h"
 
 Tracker::Tracker(int id)
-    :   monitor{SerialManager::get_monitor_serial()},
+    :   id{id},
+        monitor{SerialManager::get_monitor_serial()},
         stage{Stage::INITIALIZING},
         start_location_settling{0},
         wakeup_cause{esp_sleep_get_wakeup_cause()}
 {
     location.valid = false;
-    snprintf(server_url,sizeof(server_url)/sizeof(char), "%s%d", server_base_url, id);
 
     // esp_task_wdt_init(WDT_TIMEOUT, true);  // enable panic so ESP32 restarts
     // esp_task_wdt_add(NULL);
@@ -42,7 +42,6 @@ void Tracker::loop()
         case Stage::INITIALIZING:
             monitor.println("Initializing...");
             monitor.println("Wakeup cause: " + String(static_cast<uint8_t>(wakeup_cause)));
-            monitor.println("Server: " + String(server_base_url));
             power_on_board();
             gnss.init();
 
@@ -190,7 +189,26 @@ void Tracker::send_info()
         msg += ",";
         msg += cpsi;
     }
-    modem.https_post(server_url, msg);
+
+    for (auto& server : servers)
+    {
+        auto url = server.get_url(id);
+        auto url_str = String(url.c_str(),url.length());
+        auto responce = modem.https_post(url_str, msg);
+
+        monitor.println("Responce url:\n" + url_str);
+        monitor.println("Responce code:\n" + String(responce.http_code));
+        if (responce.http_code >= 200 && responce.http_code < 300)
+        {
+            monitor.println("Responce header:\n" + String(responce.header));
+            monitor.println("Responce payload:\n" + String(responce.body));
+            if (server.break_on_success)
+            {
+                break;
+            }
+        }
+    }
+    
 }
 
 uint16_t Tracker::read_battery_mv()
