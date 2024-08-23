@@ -24,3 +24,9 @@ bool LocationFilter::is_started() const
 {
     return started;
 }
+
+
+void LocationFilter::reset()
+{
+    started = false;
+}

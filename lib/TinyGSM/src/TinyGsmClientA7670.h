@@ -231,6 +231,15 @@ class TinyGsmA7670 : public TinyGsmModem<TinyGsmA7670>,
     return name;
   }
 
+  String getIMEIImpl() {
+    sendAT(GF("+CGSN"));
+    streamSkipUntil('\n');  // skip first newline
+    String res = stream.readStringUntil('\n');
+    waitResponse();
+    res.trim();
+    return res;
+  }
+
   bool factoryDefaultImpl() { 
     sendAT("&F"); //Set all current parameters to manufacturer defaults
     if (waitResponse() != 1) { return false; }

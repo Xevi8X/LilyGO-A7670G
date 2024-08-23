@@ -138,3 +138,8 @@ String Modem_A7670G::get_info()
     }
     return "";
 }
+
+String Modem_A7670G::get_IMEI()
+{
+    return modem.getIMEI();
+}

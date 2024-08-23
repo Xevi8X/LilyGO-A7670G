@@ -16,6 +16,7 @@ public:
     Response https_post(const String& url, uint8_t *payload, size_t size) override;
 
     String get_info() override;
+    String get_IMEI() override;
 
 private:
     Stream&        monitor;

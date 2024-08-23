@@ -63,3 +63,12 @@ String Modem::get_info()
     }
     return backend->get_info();
 }
+
+String Modem::get_IMEI()
+{
+    if(!backend)
+    {
+        return "";
+    }
+    return backend->get_IMEI();
+}

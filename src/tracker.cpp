@@ -54,7 +54,6 @@ void Tracker::loop()
             if(millis() - timepoint > fix_timeout)
             {
                 monitor.println("Timeout!");
-                gnss.turn_off(); // < turn off to save power
                 stage = Stage::SENDING;
             }
             else if (acquire_location(gnss_dto))
@@ -69,7 +68,6 @@ void Tracker::loop()
         case Stage::LOCATION_SETTLING:
             if(millis() - timepoint > location_settling_time)
             {
-                gnss.turn_off(); // < turn off to save power
                 if(location.filter.is_started())
                 {
                     location.dto = location.filter.get();
@@ -92,8 +90,14 @@ void Tracker::loop()
             charger_status = read_charger_status();
             monitor.println("Charger: " + String(charger_status));
 
+            calculate_sleep_duration();
+
             if (modem.init())
             {
+                monitor.print("IMEI: ");
+                monitor.println(modem.get_IMEI());
+
+
                 send_info();
                 monitor.println("Sent!");
             }
@@ -103,12 +107,38 @@ void Tracker::loop()
             }
 
             modem.turn_off();
-            stage = Stage::SLEEPING;
+            timepoint = millis();
+            stage = should_deep_sleep ? Stage::DEEP_SLEEPING : Stage::LIGHT_SLEEPING;
             break;
 
-        case Stage::SLEEPING:
+        case Stage::DEEP_SLEEPING:
+            monitor.println("Preparing for deep sleep!");
+            gnss.turn_off(); // < turn off to save power
             deep_sleep();
             break; // < this never happen
+
+        case Stage::LIGHT_SLEEPING:
+            if (millis() < timepoint || millis() - timepoint > on_charge_sleep_duration - location_settling_time)
+            {
+                location.filter.reset();
+                location.valid = false;
+                if (acquire_location(gnss_dto))
+                {
+                    monitor.println("Fix!");
+                    location.filter.push(gnss_dto);
+                    timepoint = millis();
+                    stage = Stage::LOCATION_SETTLING;
+                }
+                else
+                {
+                    stage = Stage::SENDING;
+                }
+            }
+            else
+            {
+                delay(500);
+            }
+            break;
 
     }
 }
@@ -116,7 +146,6 @@ void Tracker::loop()
 void Tracker::deep_sleep() 
 {
     power_off_board();
-    uint64_t sleep_duration = calculate_sleep_duration();
     if (sleep_duration > 0)
     {
         // sanity check
@@ -166,6 +195,16 @@ void Tracker::send_info()
         msg += ",0";
     }
 
+    msg += ",";
+    if (sleep_duration > 0)
+    {
+        msg += String(sleep_duration);
+    }
+    else
+    {
+        msg += String(sleep_error);
+    }
+
     if (location.valid)
     {
         msg += ",";
@@ -175,13 +214,17 @@ void Tracker::send_info()
         msg += ",";
         msg += String(location.dto.altitude,4);
         msg += ",";
+        msg += String(location.dto.speed,2);
+        msg += ",";
+        msg += String(location.dto.course,1);
+        msg += ",";
         msg += String(location.dto.HDOP);
         msg += ",";
         msg += String(location.dto.satellites);
     }
     else
     {
-        msg += ",0,0,0,0,0";
+        msg += ",0,0,0,0,0,0,0";
     }
     String cpsi = modem.get_info();
     if (cpsi.length() > 0)
@@ -249,22 +292,40 @@ bool Tracker::acquire_location(GNSS_DTO& location)
     return false;
 }
 
-uint64_t Tracker::calculate_sleep_duration() 
+void Tracker::calculate_sleep_duration() 
 {
+    should_deep_sleep = true;
+    if (charger_status)
+    {
+        sleep_duration = static_cast<uint64_t>(on_charge_sleep_duration);
+        should_deep_sleep = false;
+        return;
+    }
     if (battery_mv == 0)
     {
         monitor.println("Battery voltage is invalid!");
-        return 0LLU;
+        sleep_duration = 0LLU;
+        sleep_error = SLEEP_ERRORS::BATTERY_UNKNOWN;
+        return;
     }
-    if (battery_mv < battery_crit_mv || battery_mv > battery_overvoltage_mv)
+    if (battery_mv < battery_crit_mv)
     {
-        return 0LLU;
+        sleep_duration = 0LLU;
+        sleep_error = SLEEP_ERRORS::BATTERY_UNDERVOLTAGE;
+        return;
+    }
+    if (battery_mv > battery_overvoltage_mv)
+    {
+        sleep_duration = 0LLU;
+        sleep_error = SLEEP_ERRORS::BATTERY_OVERVOLTAGE;
+        return;
     }
     if (battery_mv < battery_low_mv)
     {
-        return low_battery_multiplier * sleep_duration_base;
+        sleep_duration = low_battery_multiplier * sleep_duration_base;
+        return;
     }
-    return sleep_duration_base;
+    sleep_duration = sleep_duration_base;
 }
 
 bool Tracker::read_charger_status()

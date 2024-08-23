@@ -8,6 +8,7 @@ public:
     void push(const GNSS_DTO& location);
     GNSS_DTO get() const;
     bool is_started() const;
+    void reset();
 
 private:
     bool started = false;
