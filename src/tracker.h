@@ -9,12 +9,11 @@
 class Tracker
 {
 public:
-    Tracker(int id = 1);
+    Tracker();
 
     void run();
     
 private:
-    int id;
     Stream& monitor;
     GNSS gnss;
     Modem modem;
@@ -65,10 +64,9 @@ private:
     void calculate_sleep_duration();
     bool read_charger_status();
 
-    ServerInfo servers[1] = {
-        {.host = "xevix.tplinkdns.com", .path = "location", .ssl = true, .break_on_success = true, .offset = 0},
-        // {.host = "dev.iotlocator.cloud", .path = "api/v1", .ssl = true, .break_on_success = true, .offset = 0},
-        // {.host = "unsafe.iotlocator.cloud", .path = "api/v1", .ssl = false, .break_on_success = true, .offset = 1000},
+    ServerInfo servers[2] = {
+        {.host = "xevix.tplinkdns.com", .path = "location", .ssl = true, .break_on_success = false},
+        {.host = "api.secondary.iotlocator.cloud", .path = "api/v1", .ssl = true, .break_on_success = true},
     };
 
     // Minimal valid information
@@ -82,8 +80,8 @@ private:
 
     // Time parameters
     static constexpr uint64_t sleep_duration_base = 3600ULL;        // 60min = 3600s
-    static constexpr uint32_t on_charge_sleep_duration = 60UL;      // 1min = 60s
-    static constexpr uint32_t fix_timeout = 300UL;                  // 5min = 300'000ms
+    static constexpr uint32_t on_charge_sleep_duration = 60000UL;   // 1min = 60'000ms
+    static constexpr uint32_t fix_timeout = 300000UL;               // 5min = 300'000ms
     static constexpr uint32_t location_settling_time = 20000UL;     // 20s = 20'000ms
     static constexpr uint64_t low_battery_multiplier = 4;           // 4 x 60min = 240min
 

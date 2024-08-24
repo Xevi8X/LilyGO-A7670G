@@ -3,9 +3,8 @@
 #include "tracker.h"
 #include "serial_manager/serial_manager.h"
 
-Tracker::Tracker(int id)
-    :   id{id},
-        monitor{SerialManager::get_monitor_serial()},
+Tracker::Tracker()
+    :   monitor{SerialManager::get_monitor_serial()},
         stage{Stage::INITIALIZING},
         start_location_settling{0},
         wakeup_cause{esp_sleep_get_wakeup_cause()}
@@ -94,10 +93,6 @@ void Tracker::loop()
 
             if (modem.init())
             {
-                monitor.print("IMEI: ");
-                monitor.println(modem.get_IMEI());
-
-
                 send_info();
                 monitor.println("Sent!");
             }
@@ -180,8 +175,11 @@ void Tracker::power_off_board()
 
 void Tracker::send_info() 
 {
-
     String msg = String(static_cast<uint8_t>(wakeup_cause));
+    String IMEI = modem.get_IMEI();
+
+    monitor.print("IMEI: ");
+    monitor.println(IMEI);
 
     msg += ",";
     msg += String(battery_mv);
@@ -235,7 +233,7 @@ void Tracker::send_info()
 
     for (auto& server : servers)
     {
-        auto url = server.get_url(id);
+        auto url = server.get_url(IMEI.c_str());
         auto url_str = String(url.c_str(),url.length());
         auto responce = modem.https_post(url_str, msg);
 

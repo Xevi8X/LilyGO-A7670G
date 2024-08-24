@@ -8,9 +8,8 @@ struct ServerInfo
     std::string path;
     bool ssl;
     bool break_on_success;
-    int offset;
 
-    std::string get_url(int id) const
+    std::string get_url(std::string id) const
     {
         std::string url = ssl ? "https://" : "http://";
         url += host;
@@ -18,7 +17,7 @@ struct ServerInfo
         {
             url += ("/" + path);
         }
-        url += ("/" + std::to_string(id + offset));
+        url += ("/" + id);
         return  url;
     }
 };
