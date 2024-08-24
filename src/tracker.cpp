@@ -113,26 +113,7 @@ void Tracker::loop()
             break; // < this never happen
 
         case Stage::LIGHT_SLEEPING:
-            if (millis() < timepoint || millis() - timepoint > on_charge_sleep_duration - location_settling_time)
-            {
-                location.filter.reset();
-                location.valid = false;
-                if (acquire_location(gnss_dto))
-                {
-                    monitor.println("Fix!");
-                    location.filter.push(gnss_dto);
-                    timepoint = millis();
-                    stage = Stage::LOCATION_SETTLING;
-                }
-                else
-                {
-                    stage = Stage::SENDING;
-                }
-            }
-            else
-            {
-                delay(500);
-            }
+            light_sleep();
             break;
 
     }
@@ -156,6 +137,31 @@ void Tracker::deep_sleep()
     monitor.println("Bye!");
     esp_deep_sleep_start();
     power_on_board(); // < this never happen
+}
+
+void Tracker::light_sleep() 
+{
+    if (millis() < timepoint || millis() - timepoint > static_cast<uint32_t>(sleep_duration * 1000ULL) - location_settling_time)
+    {
+        GNSS_DTO gnss_dto;
+        location.filter.reset();
+        location.valid = false;
+        if (acquire_location(gnss_dto))
+        {
+            monitor.println("Fix!");
+            location.filter.push(gnss_dto);
+            timepoint = millis();
+            stage = Stage::LOCATION_SETTLING;
+        }
+        else
+        {
+            stage = Stage::SENDING;
+        }
+    }
+    else
+    {
+        delay(500);
+    }
 }
 
 void Tracker::power_on_board() 
@@ -295,7 +301,7 @@ void Tracker::calculate_sleep_duration()
     should_deep_sleep = true;
     if (charger_status)
     {
-        sleep_duration = static_cast<uint64_t>(on_charge_sleep_duration);
+        sleep_duration = static_cast<uint64_t>(on_charge_sleep_duration) / 1000ULL;
         should_deep_sleep = false;
         return;
     }

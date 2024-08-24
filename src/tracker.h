@@ -55,6 +55,7 @@ private:
     
     void loop();  
     void deep_sleep();
+    void light_sleep();
     void power_on_board();
     void power_off_board();
     void send_info();
