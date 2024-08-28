@@ -13,4 +13,6 @@ public:
 private:
     bool started = false;
     GNSS_DTO best_location;
+
+    static constexpr float min_moving_speed = 2.0f;
 };

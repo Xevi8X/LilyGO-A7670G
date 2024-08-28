@@ -9,10 +9,25 @@ void LocationFilter::push(const GNSS_DTO &location)
         return;
     }
 
-    if (location.HDOP < best_location.HDOP)
+    if (location.flags & GNSS_DTO_Flags::SPEED && location.speed > min_moving_speed)
     {
         best_location = location;
+        return;
     }
+
+    if (location.flags & GNSS_DTO_Flags::HDOP 
+        && location.HDOP < best_location.HDOP)
+    {
+        best_location = location;
+        return;
+    }
+
+    if (!(best_location.flags & GNSS_DTO_Flags::HDOP))
+    {
+        best_location = location;
+        return;
+    }
+
 }
 
 GNSS_DTO LocationFilter::get() const

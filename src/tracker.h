@@ -37,6 +37,7 @@ private:
 
     Stage stage;
     uint32_t timepoint;
+    uint32_t timeout;
 
     uint32_t start_location_settling;
     struct 
@@ -91,5 +92,5 @@ private:
     static constexpr uint16_t battery_low_mv = 3500;
     static constexpr uint16_t battery_overvoltage_mv = 4350;
 
-
+    static constexpr char protocol_version = 'A';
 };

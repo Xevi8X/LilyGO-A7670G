@@ -47,10 +47,11 @@ void Tracker::loop()
             monitor.println("Fixing...");
             timepoint = millis();
             stage = Stage::FIXING;
+            timeout = fix_timeout;
             break;
 
         case Stage::FIXING:
-            if(millis() - timepoint > fix_timeout)
+            if(millis() - timepoint > timeout)
             {
                 monitor.println("Timeout!");
                 stage = Stage::SENDING;
@@ -141,27 +142,9 @@ void Tracker::deep_sleep()
 
 void Tracker::light_sleep() 
 {
-    if (millis() < timepoint || millis() - timepoint > static_cast<uint32_t>(sleep_duration * 1000ULL) - location_settling_time)
-    {
-        GNSS_DTO gnss_dto;
-        location.filter.reset();
-        location.valid = false;
-        if (acquire_location(gnss_dto))
-        {
-            monitor.println("Fix!");
-            location.filter.push(gnss_dto);
-            timepoint = millis();
-            stage = Stage::LOCATION_SETTLING;
-        }
-        else
-        {
-            stage = Stage::SENDING;
-        }
-    }
-    else
-    {
-        delay(500);
-    }
+    timepoint = millis();
+    stage = Stage::FIXING;
+    timeout = static_cast<uint32_t>(sleep_duration * 1000ULL) - location_settling_time;
 }
 
 void Tracker::power_on_board() 
@@ -181,11 +164,13 @@ void Tracker::power_off_board()
 
 void Tracker::send_info() 
 {
-    String msg = String(static_cast<uint8_t>(wakeup_cause));
+    String msg = String(protocol_version);
     String IMEI = modem.get_IMEI();
-
     monitor.print("IMEI: ");
     monitor.println(IMEI);
+
+    msg += ",";
+    String msg = String(static_cast<uint8_t>(wakeup_cause));
 
     msg += ",";
     msg += String(battery_mv);
