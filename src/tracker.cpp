@@ -6,7 +6,8 @@
 Tracker::Tracker()
     :   monitor{SerialManager::get_monitor_serial()},
         stage{Stage::INITIALIZING},
-        start_location_settling{0},
+        fixing_timeout_timepoint{0},
+        settling_timeout_timepoint{0},
         wakeup_cause{esp_sleep_get_wakeup_cause()}
 {
     location.valid = false;
@@ -45,13 +46,13 @@ void Tracker::loop()
             gnss.init();
 
             monitor.println("Fixing...");
-            timepoint = millis();
             stage = Stage::FIXING;
-            timeout = fix_timeout;
+            fixing_timeout_timepoint = millis() + fix_timeout;
+            settling_timeout_timepoint = 0U;
             break;
 
         case Stage::FIXING:
-            if(millis() - timepoint > timeout)
+            if(millis() > fixing_timeout_timepoint)
             {
                 monitor.println("Timeout!");
                 stage = Stage::SENDING;
@@ -60,13 +61,16 @@ void Tracker::loop()
             {
                 monitor.println("First fix!");
                 location.filter.push(gnss_dto);
-                timepoint = millis();
                 stage = Stage::LOCATION_SETTLING;
+                if (settling_timeout_timepoint == 0U)
+                {
+                    settling_timeout_timepoint = millis() + location_settling_time;
+                }
             }
             break;
 
         case Stage::LOCATION_SETTLING:
-            if(millis() - timepoint > location_settling_time)
+            if(millis() > settling_timeout_timepoint)
             {
                 if(location.filter.is_started())
                 {
@@ -103,7 +107,6 @@ void Tracker::loop()
             }
 
             modem.turn_off();
-            timepoint = millis();
             stage = should_deep_sleep ? Stage::DEEP_SLEEPING : Stage::LIGHT_SLEEPING;
             break;
 
@@ -142,9 +145,9 @@ void Tracker::deep_sleep()
 
 void Tracker::light_sleep() 
 {
-    timepoint = millis();
     stage = Stage::FIXING;
-    timeout = static_cast<uint32_t>(sleep_duration * 1000ULL) - location_settling_time;
+    settling_timeout_timepoint = millis() + static_cast<uint32_t>(sleep_duration * 1000ULL);
+    fixing_timeout_timepoint = settling_timeout_timepoint - location_settling_time;
 }
 
 void Tracker::power_on_board() 
@@ -170,7 +173,7 @@ void Tracker::send_info()
     monitor.println(IMEI);
 
     msg += ",";
-    String msg = String(static_cast<uint8_t>(wakeup_cause));
+    msg += String(static_cast<uint8_t>(wakeup_cause));
 
     msg += ",";
     msg += String(battery_mv);
@@ -284,7 +287,9 @@ bool Tracker::acquire_location(GNSS_DTO& location)
 void Tracker::calculate_sleep_duration() 
 {
     should_deep_sleep = true;
+#if !defined(FORCE_LIGHT_SLEEP)
     if (charger_status)
+#endif
     {
         sleep_duration = static_cast<uint64_t>(on_charge_sleep_duration) / 1000ULL;
         should_deep_sleep = false;

@@ -36,10 +36,11 @@ private:
     };
 
     Stage stage;
-    uint32_t timepoint;
-    uint32_t timeout;
 
-    uint32_t start_location_settling;
+
+    uint32_t fixing_timeout_timepoint;
+    uint32_t settling_timeout_timepoint;
+
     struct 
     {
         bool valid;

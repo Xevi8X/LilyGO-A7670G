@@ -38,3 +38,4 @@
 #define BOARD_CHARGER_STATUS_PIN              32
 
 // #define BATTERY_READ_TEST
+// #define FORCE_LIGHT_SLEEP
